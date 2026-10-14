@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:tns="http://server.com/banking/ws" targetNamespace="http://server.com/banking/ws" elementFormDefault="qualified">
+
+    <!-- ===== Tipos simples ===== -->
+    <xs:simpleType name="AccountNumber">
+        <xs:restriction base="xs:string">
+            <xs:pattern value="[0-9]{12}"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="Money">
+        <xs:restriction base="xs:decimal">
+            <xs:minExclusive value="0"/>
+            <xs:totalDigits value="19"/>
+            <xs:fractionDigits value="2"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <!-- ===== GetBalance ===== -->
+    <xs:element name="GetBalanceRequest">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="accountNumber" type="tns:AccountNumber"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <xs:element name="GetBalanceResponse">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="accountNumber" type="tns:AccountNumber"/>
+                <xs:element name="balance" type="xs:decimal"/>
+                <xs:element name="currency" type="xs:string"/>
+                <xs:element name="status" type="xs:string"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <!-- ===== Transfer (liquidación interbancaria / batch) ===== -->
+    <xs:element name="TransferRequest">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="sourceAccountNumber" type="tns:AccountNumber"/>
+                <xs:element name="destinationAccountNumber" type="tns:AccountNumber"/>
+                <xs:element name="amount" type="tns:Money"/>
+                <xs:element name="description" minOccurs="0">
+                    <xs:simpleType>
+                        <xs:restriction base="xs:string">
+                            <xs:maxLength value="255"/>
+                        </xs:restriction>
+                    </xs:simpleType>
+                </xs:element>
+                <!-- Clave de idempotencia: reenviar la misma referencia no duplica el movimiento -->
+                <xs:element name="reference" minOccurs="0">
+                    <xs:simpleType>
+                        <xs:restriction base="xs:string">
+                            <xs:maxLength value="64"/>
+                        </xs:restriction>
+                    </xs:simpleType>
+                </xs:element>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <xs:element name="TransferResponse">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="transactionReference" type="xs:string"/>
+                <xs:element name="status" type="xs:string"/>
+                <xs:element name="amount" type="xs:decimal"/>
+                <xs:element name="createdAt" type="xs:dateTime"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+</xs:schema>
