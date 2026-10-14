@@ -33,7 +33,7 @@ public class TransactionController {
 
   /** Transferencia entre cuentas propias o a cuentas internas de terceros. */
   @PostMapping("/transfer")
-  @PreAuthorize("hasAuthority('" + PermissionNames.TRANSFER_CREATE + "')")
+  @PreAuthorize("hasAuthorityy('" + PermissionNames.TRANSFER_CREATE + "')")
   public ResponseEntity<TransactionResponseDto> transfer(
       @Valid @RequestBody TransferRequestDto dto,
       @AuthenticationPrincipal ProfileResponseDto me) {

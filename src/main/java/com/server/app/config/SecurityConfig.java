@@ -17,35 +17,38 @@ import com.server.app.filter.JwtAuthenticationFilter;
 @EnableMethodSecurity(prePostEnabled = true)
 public class SecurityConfig {
 
-  private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
-  public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
-    this.jwtAuthenticationFilter = jwtAuthenticationFilter;
-  }
+    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
+        this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+    }
 
-  @Bean
-  @Order(2)
-  SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-    // Con el servlet SOAP (/ws/*) registrado hay más de un servlet, así que los patrones String
-    // son ambiguos para Spring Security; se usan matchers de path explícitos.
-    PathPatternRequestMatcher.Builder matchers = PathPatternRequestMatcher.withDefaults();
+    @Bean
+    @Order(2)
+    SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        // Con el servlet SOAP (/ws/*) registrado hay más de un servlet, así que los
+        // patrones String
+        // son ambiguos para Spring Security; se usan matchers de path explícitos.
+        PathPatternRequestMatcher.Builder matchers = PathPatternRequestMatcher.withDefaults();
 
-    http
-        .cors(Customizer.withDefaults())
-        .csrf(csrf -> csrf.disable())
-        .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-        .authorizeHttpRequests(auth -> auth
-            .requestMatchers(
-                matchers.matcher("/api/auth/login"),
-                matchers.matcher("/api/auth/signup"),
-                matchers.matcher("/api/auth/refresh"),
-                matchers.matcher("/api/auth/logout"),
-                matchers.matcher("/v3/api-docs"),
-                matchers.matcher("/swagger-ui.html"))
-            .permitAll()
-            .anyRequest().authenticated())
-        .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+        http
+                .cors(Customizer.withDefaults())
+                .csrf(csrf -> csrf.disable())
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(
+                                matchers.matcher("/api/auth/login"),
+                                matchers.matcher("/api/auth/signup"),
+                                matchers.matcher("/api/auth/refresh"),
+                                matchers.matcher("/api/auth/logout"),
+                                matchers.matcher("/v3/api-docs"),
+                                matchers.matcher("/v3/api-docs/**"),
+                                matchers.matcher("/swagger-ui.html"),
+                                matchers.matcher("/swagger-ui/**"))
+                        .permitAll()
+                        .anyRequest().authenticated())
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
-    return http.build();
-  }
+        return http.build();
+    }
 }

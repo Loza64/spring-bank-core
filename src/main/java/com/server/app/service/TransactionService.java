@@ -11,6 +11,8 @@ import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.server.app.common.exceptions.BadRequestException;
@@ -36,9 +38,18 @@ import lombok.RequiredArgsConstructor;
  * Capa transaccional ÚNICA para mover dinero. Tanto los controladores REST como
  * los endpoints SOAP pasan por aquí, así que las reglas de negocio y la
  * atomicidad son idénticas sin importar el canal.
+ *
+ * Estrategia transaccional:
+ * - Por defecto TODO el servicio es de solo lectura (readOnly = true): Spring
+ *   optimiza la sesión y la base de datos rechaza cualquier escritura accidental.
+ * - Los métodos que mueven dinero la sobrescriben con una transacción de
+ *   escritura. Si lanzan CUALQUIER excepción (BadRequest, Conflict, NotFound,
+ *   errores de BD, etc.) Spring hace rollback automático de todo: saldos y
+ *   registro de la transacción. No hay try/catch ni rollback manual.
  */
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class TransactionService {
 
   private final AccountRepository accountRepository;
@@ -63,7 +74,13 @@ public class TransactionService {
       boolean enforceOwnership) {
   }
 
-  @Transactional
+  /**
+   * REQUIRED: se une a la transacción existente o crea una nueva.
+   * READ_COMMITTED + bloqueo pesimista de filas: evita lecturas sucias y lost update.
+   * rollbackFor = Exception.class: rollback también ante excepciones checked.
+   * timeout: si no obtiene los bloqueos a tiempo, aborta y hace rollback.
+   */
+  @Transactional(propagation = Propagation.REQUIRED, isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class, timeout = 15)
   public TransactionResponseDto transfer(TransferCommand cmd) {
     validateAmount(cmd.amount());
 
@@ -116,6 +133,8 @@ public class TransactionService {
       throw new ConfictException("Fondos insuficientes");
     }
 
+    // Entidades gestionadas: Hibernate hace el UPDATE al confirmar (dirty checking).
+    // Si algo falla después de estas líneas, el rollback deshace ambos saldos.
     src.setBalance(src.getBalance().subtract(totalDebit));
     dst.setBalance(dst.getBalance().add(cmd.amount()));
 
@@ -135,7 +154,7 @@ public class TransactionService {
     return mapper.toResponseDto(transactionRepository.save(tx));
   }
 
-  @Transactional
+  @Transactional(propagation = Propagation.REQUIRED, isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class, timeout = 15)
   public TransactionResponseDto deposit(String accountNumber, BigDecimal amount, String description,
       Channel channel, Long operatorId) {
     validateAmount(amount);
@@ -159,7 +178,7 @@ public class TransactionService {
     return mapper.toResponseDto(transactionRepository.save(tx));
   }
 
-  @Transactional
+  @Transactional(propagation = Propagation.REQUIRED, isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class, timeout = 15)
   public TransactionResponseDto withdraw(String accountNumber, BigDecimal amount, String description,
       Channel channel, Long operatorId) {
     validateAmount(amount);
@@ -186,18 +205,17 @@ public class TransactionService {
     return mapper.toResponseDto(transactionRepository.save(tx));
   }
 
-  @Transactional(readOnly = true)
+  // ── Lecturas: heredan readOnly = true del nivel de clase ────────────────
+
   public PaginationResponse<TransactionResponseDto> findMine(Long userId, Pageable pageable) {
     Page<Transaction> page = transactionRepository.findAllByParticipantUser(userId, pageable);
     return paginationMapper.toPaginationResponse(page.map(mapper::toResponseDto));
   }
 
-  @Transactional(readOnly = true)
   public PaginationResponse<TransactionResponseDto> findAll(Pageable pageable) {
     return paginationMapper.toPaginationResponse(transactionRepository.findAll(pageable).map(mapper::toResponseDto));
   }
 
-  @Transactional(readOnly = true)
   public TransactionResponseDto findById(Long id, Long requesterId, boolean staff) {
     Transaction tx = transactionRepository.findById(id)
         .orElseThrow(() -> new NotFoundException("Transacción no encontrada con ID: " + id));
@@ -212,7 +230,6 @@ public class TransactionService {
   }
 
   // ── helpers ──────────────────────────────────────────────────────────────
-
   private Map<Long, Account> lock(Long... ids) {
     List<Account> accounts = accountRepository.lockAllByIdIn(List.of(ids));
     return accounts.stream().collect(Collectors.toMap(Account::getId, Function.identity()));
