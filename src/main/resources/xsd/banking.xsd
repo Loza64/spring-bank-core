@@ -16,6 +16,11 @@
         </xs:restriction>
     </xs:simpleType>
 
+    <!-- ===== Errores =====
+         Va dentro de <detail> del SOAP Fault. Valores: NOT_FOUND, BAD_REQUEST,
+         CONFLICT, FORBIDDEN, UNAUTHORIZED, INTERNAL_ERROR -->
+    <xs:element name="errorCode" type="xs:string"/>
+
     <!-- ===== GetBalance ===== -->
     <xs:element name="GetBalanceRequest">
         <xs:complexType>

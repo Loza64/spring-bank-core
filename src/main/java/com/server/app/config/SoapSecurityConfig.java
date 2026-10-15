@@ -1,6 +1,6 @@
 package com.server.app.config;
 
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -8,6 +8,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
@@ -15,11 +16,12 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 
 /**
- * Cadena de seguridad exclusiva para /ws/**. Los socios/sistemas externos no
- * usan JWT: se autentican como cliente máquina con HTTP Basic (sobre TLS).
- * Para WS-Security con certificados (WSS4J) este es el punto a reemplazar.
+ * Cadena de seguridad solo para /ws/**. Los socios no usan JWT: entran como
+ * cliente máquina con HTTP Basic (siempre sobre TLS en prod).
+ * Si algún día piden WS-Security con certificados, este es el lugar a cambiar.
  */
 @Configuration
+@EnableConfigurationProperties(SoapProperties.class)
 public class SoapSecurityConfig {
 
   public static final String SOAP_CLIENT = "SOAP_CLIENT";
@@ -29,12 +31,10 @@ public class SoapSecurityConfig {
   SecurityFilterChain soapSecurityFilterChain(
       HttpSecurity http,
       PasswordEncoder encoder,
-      @Value("${security.soap.username}") String username,
-      @Value("${security.soap.password}") String password) throws Exception {
+      SoapProperties properties) throws Exception {
 
-    UserDetails client = org.springframework.security.core.userdetails.User
-        .withUsername(username)
-        .password(encoder.encode(password))
+    UserDetails client = User.withUsername(properties.username())
+        .password(encoder.encode(properties.password()))
         .authorities(SOAP_CLIENT)
         .build();
 
@@ -42,7 +42,7 @@ public class SoapSecurityConfig {
 
     http
         .securityMatcher(matchers.matcher("/ws/**"))
-        .csrf(csrf -> csrf.disable())
+        .csrf(csrf -> csrf.disable()) // no hay cookies ni sesión, csrf no aplica
         .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .userDetailsService(new InMemoryUserDetailsManager(client))
         .authorizeHttpRequests(auth -> auth
