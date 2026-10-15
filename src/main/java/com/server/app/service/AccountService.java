@@ -2,6 +2,7 @@ package com.server.app.service;
 
 import java.math.BigDecimal;
 import java.security.SecureRandom;
+import java.util.Optional;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -78,9 +79,14 @@ public class AccountService {
   /** Uso interno del canal SOAP (cliente máquina autenticado, sin usuario humano). */
   @Transactional(readOnly = true)
   public AccountResponseDto findByAccountNumber(String accountNumber) {
-    return repository.findByAccountNumber(accountNumber)
-        .map(mapper::toResponseDto)
+    return findOptionalByAccountNumber(accountNumber)
         .orElseThrow(() -> new NotFoundException("Cuenta no encontrada: " + accountNumber));
+  }
+
+  /** Igual que la anterior pero sin lanzar 404; para validar si una cuenta existe. */
+  @Transactional(readOnly = true)
+  public Optional<AccountResponseDto> findOptionalByAccountNumber(String accountNumber) {
+    return repository.findByAccountNumber(accountNumber).map(mapper::toResponseDto);
   }
 
   @Transactional(readOnly = true)

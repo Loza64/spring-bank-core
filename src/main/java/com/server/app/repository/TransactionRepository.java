@@ -35,4 +35,18 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
       where s.user.id = :userId or d.user.id = :userId
       """)
   Page<Transaction> findAllByParticipantUser(@Param("userId") Long userId, Pageable pageable);
+
+  // movimientos donde la cuenta es origen o destino (estado de cuenta)
+  @Query(value = """
+      select t from Transaction t
+        left join fetch t.sourceAccount s
+        left join fetch t.destinationAccount d
+      where s.accountNumber = :accountNumber or d.accountNumber = :accountNumber
+      """, countQuery = """
+      select count(t) from Transaction t
+        left join t.sourceAccount s
+        left join t.destinationAccount d
+      where s.accountNumber = :accountNumber or d.accountNumber = :accountNumber
+      """)
+  Page<Transaction> findAllByAccountNumber(@Param("accountNumber") String accountNumber, Pageable pageable);
 }

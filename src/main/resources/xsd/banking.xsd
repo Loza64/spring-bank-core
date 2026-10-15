@@ -21,6 +21,76 @@
          CONFLICT, FORBIDDEN, UNAUTHORIZED, INTERNAL_ERROR -->
     <xs:element name="errorCode" type="xs:string"/>
 
+    <xs:simpleType name="Reference">
+        <xs:restriction base="xs:string">
+            <xs:minLength value="1"/>
+            <xs:maxLength value="64"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="PageNumber">
+        <xs:restriction base="xs:int">
+            <xs:minInclusive value="1"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="PageSize">
+        <xs:restriction base="xs:int">
+            <xs:minInclusive value="1"/>
+            <xs:maxInclusive value="100"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <!-- Enums: mantenerlos igual que los de Java (SoapContractTest lo verifica) -->
+    <xs:simpleType name="AccountStatus">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="ACTIVE"/>
+            <xs:enumeration value="FROZEN"/>
+            <xs:enumeration value="CLOSED"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="TransactionType">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="DEPOSIT"/>
+            <xs:enumeration value="WITHDRAWAL"/>
+            <xs:enumeration value="TRANSFER"/>
+            <xs:enumeration value="PAYMENT"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="TransactionStatus">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="PENDING"/>
+            <xs:enumeration value="COMPLETED"/>
+            <xs:enumeration value="FAILED"/>
+            <xs:enumeration value="REVERSED"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="Channel">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="REST"/>
+            <xs:enumeration value="SOAP"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <!-- ===== Tipo compartido: un movimiento ===== -->
+    <xs:complexType name="TransactionInfo">
+        <xs:sequence>
+            <xs:element name="transactionReference" type="xs:string"/>
+            <xs:element name="type" type="tns:TransactionType"/>
+            <xs:element name="status" type="tns:TransactionStatus"/>
+            <xs:element name="amount" type="xs:decimal"/>
+            <!-- un depósito no trae origen y un retiro no trae destino -->
+            <xs:element name="sourceAccountNumber" type="tns:AccountNumber" minOccurs="0"/>
+            <xs:element name="destinationAccountNumber" type="tns:AccountNumber" minOccurs="0"/>
+            <xs:element name="channel" type="tns:Channel"/>
+            <xs:element name="description" type="xs:string" minOccurs="0"/>
+            <xs:element name="createdAt" type="xs:dateTime"/>
+        </xs:sequence>
+    </xs:complexType>
+
     <!-- ===== GetBalance ===== -->
     <xs:element name="GetBalanceRequest">
         <xs:complexType>
@@ -74,6 +144,67 @@
                 <xs:element name="status" type="xs:string"/>
                 <xs:element name="amount" type="xs:decimal"/>
                 <xs:element name="createdAt" type="xs:dateTime"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <!-- ===== ValidateAccount (antes de transferir: ¿existe y está activa?) ===== -->
+    <xs:element name="ValidateAccountRequest">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="accountNumber" type="tns:AccountNumber"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <xs:element name="ValidateAccountResponse">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="exists" type="xs:boolean"/>
+                <!-- solo vienen si la cuenta existe -->
+                <xs:element name="status" type="tns:AccountStatus" minOccurs="0"/>
+                <xs:element name="currency" type="xs:string" minOccurs="0"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <!-- ===== GetTransactionStatus (consulta por referencia, útil tras un timeout) ===== -->
+    <xs:element name="GetTransactionStatusRequest">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="reference" type="tns:Reference"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <xs:element name="GetTransactionStatusResponse">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="transaction" type="tns:TransactionInfo"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <!-- ===== GetAccountStatement (movimientos paginados, más recientes primero) ===== -->
+    <xs:element name="GetAccountStatementRequest">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="accountNumber" type="tns:AccountNumber"/>
+                <xs:element name="page" type="tns:PageNumber" minOccurs="0"/>
+                <xs:element name="size" type="tns:PageSize" minOccurs="0"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <xs:element name="GetAccountStatementResponse">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="accountNumber" type="tns:AccountNumber"/>
+                <xs:element name="page" type="xs:int"/>
+                <xs:element name="pageSize" type="xs:int"/>
+                <xs:element name="pageCount" type="xs:int"/>
+                <xs:element name="total" type="xs:long"/>
+                <xs:element name="transaction" type="tns:TransactionInfo" minOccurs="0" maxOccurs="unbounded"/>
             </xs:sequence>
         </xs:complexType>
     </xs:element>

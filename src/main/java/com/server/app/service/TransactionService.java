@@ -9,7 +9,9 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Propagation;
@@ -227,6 +229,23 @@ public class TransactionService {
       }
     }
     return mapper.toResponseDto(tx);
+  }
+
+  public TransactionResponseDto findByReference(String reference) {
+    return transactionRepository.findByTransactionReference(reference)
+        .map(mapper::toResponseDto)
+        .orElseThrow(() -> new NotFoundException("Transacción no encontrada: " + reference));
+  }
+
+  /** Estado de cuenta: lo más reciente primero (el orden lo fija el servicio, no el cliente). */
+  public PaginationResponse<TransactionResponseDto> findByAccountNumber(String accountNumber, Pageable pageable) {
+    if (!accountRepository.existsByAccountNumber(accountNumber)) {
+      throw new NotFoundException("Cuenta no encontrada: " + accountNumber);
+    }
+    Pageable sorted = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(),
+        Sort.by(Sort.Direction.DESC, "createdAt", "id"));
+    Page<Transaction> page = transactionRepository.findAllByAccountNumber(accountNumber, sorted);
+    return paginationMapper.toPaginationResponse(page.map(mapper::toResponseDto));
   }
 
   // ── helpers ──────────────────────────────────────────────────────────────
